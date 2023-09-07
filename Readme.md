@@ -8,16 +8,19 @@
 
 3. Get an Amazon owned AMI using the Describe Images Command Flag:        
 *aws ec2 describe-images \ \
- --owners amazon \ \
- --filters "Name=name, Values=amzn2--ami-hvm-2.0* &nbsp;
+    --owners amazon \ \
+    --filters "Name=name,Values=amzn2-ami-hvm-2.0.????????.?-x86_64-gp2" "Name=root-device-type,Values=ebs" "Name=virtualization-type, Values=hvm" \ \
+    --query 'Images[0].[ImageId]' \ \
+    --output text*
 
- 4. Create an EC2 instance using the "Run instance" command flag:      
+
+ 1. Create an EC2 instance using the "Run instance" command flag:      
  *aws ec2 run-instances \ \
 --image-id ami-038b3df3312ddf25d \ \
 --instance-type t2.micro \ \
 --count 1 \ \
 --key-name Lala \ \
---security-group-ids sg-020b176d16ae1479c \ \
+--security-group-ids  \ \
 --user-data $'#!/bin/bash\nsudo su\nyum update -y\nyum install httpd -y\nsystemctl start httpd'*
 
 

@@ -1,11 +1,12 @@
 import boto3
-import time
 
-def ami_state(ec2_client):
+
+def ami_state(ec2_client, AMI):
     # Checking if the AMI state is available
     response = ec2_client.describe_images(ImageIds=[AMI])
-    ami_state = response['Images'][0]['State']
+    ami_state = response["Images"][0]["State"]
     return ami_state
+
 
 # Get Amazon AMIs owned by Amazon
 def Get_Image(ec2_client):
@@ -14,7 +15,14 @@ def Get_Image(ec2_client):
             {
                 "Name": "name",
                 "Values": [
-                    "amzn2-ami-hvm*",
+                    # "amzn2-ami-hvm*",
+                    "al2023-ami-2023*",
+                ],
+            },
+            {
+                "Name": "boot-mode",
+                "Values": [
+                    "uefi-preferred",
                 ],
             },
             {
@@ -30,20 +38,25 @@ def Get_Image(ec2_client):
 
 
 # Create EC2 instance
-def Start_Ec2(AMI, ec2_client,ec2_resource,ami_state):
+def Start_Ec2(AMI, ec2_client, ec2_resource, ami_state, user_data):
     """Use the AMI gotten from the Get Image to create an EC2 instance"""
 
-    # Checking if the AMI state is available
-    response = ec2_client.describe_images(ImageIds=[AMI])
-    ami_state = response['Images'][0]['State']
-    print(ami_state)
-    if ami_state == "available":  
-        #Create instance if AMI state is available
+    if ami_state == "available":
+        # Create instance if AMI state is available
         instance = ec2_client.run_instances(
             ImageId=AMI,
             InstanceType="t2.micro",
             MaxCount=1,
             MinCount=1,
+            KeyName = "Lala",
+            UserData=user_data,
+            SecurityGroupIds = ["sg-020b176d16ae1479c",],
+            TagSpecifications=[
+                {
+                    "ResourceType": "instance",
+                    "Tags": [{"Key": "Name", "Value": "CIL_ACADEMY"}],
+                }
+            ],
         )
         # This is to print the newly created Instance ID
         ec2 = ec2_resource.Instance(instance["Instances"][0]["InstanceId"])
@@ -52,35 +65,37 @@ def Start_Ec2(AMI, ec2_client,ec2_resource,ami_state):
         print("The AMI was not available")
         return None
 
-    
-# Used to only run the code inside the if statement when the program is run directly by the Python interpreter. The code inside the if statement is not executed when the file's code is imported as a module".
-#This means i can make use of the two other functions when i Import this file as a module without running the specific tasks or tests meant for standalone execution.
-if __name__ == "__main__":
 
+# Used to only run the code inside the if statement when the program is run directly by the Python interpreter. The code inside the if statement is not executed when the file's code is imported as a module".
+# This means i can make use of the two other functions when i Import this file as a module without running the specific tasks or tests meant for standalone execution.
+if __name__ == "__main__":
     # Create an EC2 client object & Resource
     ec2_client = boto3.client("ec2")
     ec2_resource = boto3.resource("ec2")
 
+    # Create User Data Variable to install Apache server
+    User_data = """#!/bin/bash
+        sudo su
+        yum update -y
+        yum install httpd -y
+        echo "<h1>This is Cohort 6 Server</h1>" > /var/www/html/index.html
+        echo "<h2>This is my private IP: $(hostname -f)</h2>" >> /var/www/html/index.html
+        systemctl start httpd"""
+
     # Get AMI
     AMI = Get_Image(ec2_client)
 
-    #Get AMI State
-    Ami_State = ami_state(ec2_client)
+    # Get AMI State
+    Ami_State = ami_state(ec2_client, AMI)
 
     # Create and start the ec2 instance
-    ec2 = Start_Ec2(AMI, ec2_client,ec2_resource,Ami_State)
-
+    ec2 = Start_Ec2(AMI, ec2_client, ec2_resource, Ami_State, User_data)
 
     # Print Ec2 Instance ID
-    Instance= ec2_resource.Instance(ec2.instance_id)
-    print(dir(Instance))
+    Instance = ec2_resource.Instance(ec2.instance_id)
 
     # Using boto3 Waiters
     ec2.wait_until_running()
-    while Instance.state == "running":
-        print('.', end='', flush=True)
-        time.sleep(.1)
-
 
     print(f"Instance is {ec2.state['Name']}")
 
@@ -90,5 +105,3 @@ if __name__ == "__main__":
     # Using boto3 Waiters
     ec2.wait_until_terminated()
     print(f"Instance is {ec2.state['Name']}")
-
-
